@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BCI Flashcard with Page Display</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: #f0f8ff;
+      padding: 50px;
+    }
+    #flashcard {
+      background: white;
+      border-radius: 10px;
+      box-shadow: 0 0 15px #aaa;
+      padding: 30px;
+      width: 400px;
+      margin: auto;
+      display: none;
+    }
+    .word {
+      font-size: 28px;
+      font-weight: bold;
+    }
+    .definition {
+      margin-top: 10px;
+      font-size: 18px;
+      color: #555;
+    }
+    .page-number {
+      margin-top: 15px;
+      font-size: 16px;
+      color: #888;
+    }
+    .nav-buttons {
+      margin-top: 20px;
+    }
+    .nav-btn {
+      font-size: 24px;
+      padding: 8px 16px;
+      margin: 0 10px;
+      background: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .focus-btn {
+      padding: 12px 24px;
+      font-size: 18px;
+      margin-bottom: 30px;
+      background: #28a745;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🧠 BCI Flashcard Focus Simulator</h1>
+  <button class="focus-btn" id="focusButton">Start Focus</button>
+
+  <div id="flashcard">
+    <div class="word" id="word">Loading...</div>
+    <div class="definition" id="definition">...</div>
+    <div class="page-number" id="pageNumber">Page 1 of 1</div>
+    <div class="nav-buttons">
+      <button class="nav-btn" id="prevBtn">‹</button>
+      <button class="nav-btn" id="nextBtn">›</button>
+    </div>
+  </div>
+
+  <script>
+    const flashcards = [
+      { word: "represent", meaning: "To stand for or act for something or someone." },
+      { word: "exclusive", meaning: "Only for a special group; not shared." },
+      { word: "gullible", meaning: "Easily tricked or fooled." },
+      { word: "essential", meaning: "Very important or needed." },
+      { word: "encounter", meaning: "To meet, often unexpectedly." },
+      { word: "assign", meaning: "To give someone a task or job." },
+      { word: "analyze", meaning: "To study something closely." },
+      { word: "compare", meaning: "To find how things are alike or different." },
+      { word: "describe", meaning: "To tell about something in detail." },
+      { word: "contrast", meaning: "To show how things are different." },
+      { word: "evaluate", meaning: "To judge or decide the value of something." },
+      { word: "explain", meaning: "To make something clear." },
+      { word: "predict", meaning: "To say what you think will happen next." },
+      { word: "infer", meaning: "To figure out something using clues." },
+      { word: "support", meaning: "To back up or help an idea." },
+      { word: "summarize", meaning: "To give a short version of the main ideas." },
+      { word: "clarify", meaning: "To make something easier to understand." },
+      { word: "define", meaning: "To tell what a word or idea means." },
+      { word: "emphasize", meaning: "To show that something is important." },
+      { word: "persuade", meaning: "To convince someone to do or believe something." },
+      { word: "adjust", meaning: "To change slightly to fit or work better." },
+      { word: "respond", meaning: "To answer or reply." },
+      { word: "determine", meaning: "To decide something after thinking." },
+      { word: "recognize", meaning: "To know something from seeing it before." },
+      { word: "identify", meaning: "To name or point out." },
+      { word: "construct", meaning: "To build or put something together." },
+      { word: "indicate", meaning: "To show or point out." },
+      { word: "locate", meaning: "To find where something is." },
+      { word: "illustrate", meaning: "To explain with examples or pictures." },
+      { word: "organize", meaning: "To arrange things in order." },
+      { word: "develop", meaning: "To grow or improve something over time." },
+      { word: "communicate", meaning: "To share information or ideas." },
+      { word: "observe", meaning: "To look at carefully." },
+      { word: "participate", meaning: "To take part in something." },
+      { word: "acknowledge", meaning: "To admit or recognize something." },
+      { word: "demonstrate", meaning: "To show clearly." },
+      { word: "examine", meaning: "To study or look at closely." },
+      { word: "formulate", meaning: "To create or plan an idea." },
+      { word: "generate", meaning: "To create or produce." },
+      { word: "maintain", meaning: "To keep something the same or in good shape." },
+      { word: "proceed", meaning: "To move forward or continue." }
+    ];
+
+    let currentIndex = 0;
+
+    const wordEl = document.getElementById("word");
+    const defEl = document.getElementById("definition");
+    const pageEl = document.getElementById("pageNumber");
+    const flashcard = document.getElementById("flashcard");
+    const focusButton = document.getElementById("focusButton");
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+
+    function showCard(index) {
+      const entry = flashcards[index];
+      wordEl.textContent = entry.word;
+      defEl.textContent = entry.meaning;
+      pageEl.textContent = `Word ${index + 1} of ${flashcards.length}`;
+    }
+
+    focusButton.addEventListener("click", () => {
+      focusButton.disabled = true;
+      focusButton.textContent = "Focusing... 🧠";
+
+      setTimeout(() => {
+        flashcard.style.display = "block";
+        showCard(currentIndex);
+        focusButton.textContent = "Start Focus Again";
+        focusButton.disabled = false;
+      }, 2500); // simulate 2.5s "brain loading"
+    });
+
+    prevBtn.addEventListener("click", () => {
+      if (currentIndex > 0) {
+        currentIndex--;
+        showCard(currentIndex);
+      }
+    });
+
+    nextBtn.addEventListener("click", () => {
+      if (currentIndex < flashcards.length - 1) {
+        currentIndex++;
+        showCard(currentIndex);
+      }
+    });
+  </script>
+</body>
+</html>
