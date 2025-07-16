@@ -56,6 +56,26 @@
       border-radius: 8px;
       cursor: pointer;
     }
+    .jump-container {
+      margin-top: 25px;
+    }
+    #pageInput {
+      padding: 8px;
+      width: 80px;
+      font-size: 16px;
+      border: 1px solid #aaa;
+      border-radius: 6px;
+    }
+    #jumpBtn {
+      padding: 8px 16px;
+      font-size: 16px;
+      margin-left: 10px;
+      background: #ffc107;
+      color: black;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -66,10 +86,14 @@
   <div id="flashcard">
     <div class="word" id="word">Loading...</div>
     <div class="definition" id="definition">...</div>
-    <div class="page-number" id="pageNumber">Page 1 of 1</div>
+    <div class="page-number" id="pageNumber">Word 1 of 1</div>
     <div class="nav-buttons">
       <button class="nav-btn" id="prevBtn">‹</button>
       <button class="nav-btn" id="nextBtn">›</button>
+    </div>
+    <div class="jump-container">
+      <input type="number" id="pageInput" min="1" placeholder="Page #" />
+      <button id="jumpBtn">Go</button>
     </div>
   </div>
 
@@ -115,7 +139,18 @@
       { word: "formulate", meaning: "To create or plan an idea." },
       { word: "generate", meaning: "To create or produce." },
       { word: "maintain", meaning: "To keep something the same or in good shape." },
-      { word: "proceed", meaning: "To move forward or continue." }
+      { word: "proceed", meaning: "To move forward or continue." },
+      { word: "guidance", meaning: "Help or direction given to someone." },
+      { word: "regard", meaning: "Respect or attention given to someone or something." },
+      { word: "advice", meaning: "Helpful suggestion or idea someone gives you." },
+      { word: "congress", meaning: "A group of leaders who make laws." },
+      { word: "migration", meaning: "Moving from one place to another." },
+      { word: "consequence", meaning: "What happens because of an action." },
+      { word: "connections", meaning: "Links or relationships between things." },
+      { word: "misunderstood", meaning: "Not understood the right way." },
+      { word: "examples", meaning: "Things that show or explain an idea." },
+      { word: "refined", meaning: "Made better or more perfect; improved and polished." },
+      { word: "depending", meaning: "Relying on someone or something to happen or be perfect." }
     ];
 
     let currentIndex = 0;
@@ -127,6 +162,8 @@
     const focusButton = document.getElementById("focusButton");
     const prevBtn = document.getElementById("prevBtn");
     const nextBtn = document.getElementById("nextBtn");
+    const jumpBtn = document.getElementById("jumpBtn");
+    const pageInput = document.getElementById("pageInput");
 
     function showCard(index) {
       const entry = flashcards[index];
@@ -144,7 +181,7 @@
         showCard(currentIndex);
         focusButton.textContent = "Start Focus Again";
         focusButton.disabled = false;
-      }, 2500); // simulate 2.5s "brain loading"
+      }, 2500);
     });
 
     prevBtn.addEventListener("click", () => {
@@ -158,6 +195,16 @@
       if (currentIndex < flashcards.length - 1) {
         currentIndex++;
         showCard(currentIndex);
+      }
+    });
+
+    jumpBtn.addEventListener("click", () => {
+      const pageNum = parseInt(pageInput.value);
+      if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= flashcards.length) {
+        currentIndex = pageNum - 1;
+        showCard(currentIndex);
+      } else {
+        alert("Invalid page number.");
       }
     });
   </script>
