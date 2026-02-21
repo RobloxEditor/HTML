@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AetherOS • v9.8 Resizable • Windows Style</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+        
+        :root { --accent: 139 92 246; }
+        
+        body { font-family: 'Inter', system-ui, sans-serif; overflow: hidden; }
+        .title-font { font-family: 'Space Grotesk', sans-serif; }
+
+        #desktop { background-size: cover; background-position: center; touch-action: none; }
+        
+        .window {
+            box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.4);
+            transition: transform 0.2s cubic-bezier(0.23, 1, 0.32, 1);
+            animation: windowPopIn 0.25s cubic-bezier(0.23, 1, 0.32, 1);
+            contain: paint;
+            will-change: transform;
+        }
+        
+        @keyframes windowPopIn {
+            from { opacity: 0; transform: scale(0.92) translateY(30px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        
+        .window-header { -webkit-app-region: drag; user-select: none; touch-action: none; }
+        
+        .glass { background: rgba(15, 23, 42, 0.96); backdrop-filter: blur(12px); }
+        .taskbar { background: rgba(15, 23, 42, 0.98); backdrop-filter: blur(12px); }
+        
+        .resize-handle {
+            position: absolute;
+            background: transparent;
+            z-index: 10;
+        }
+        .resize-right   { right: 0; top: 0; bottom: 0; width: 20px; cursor: col-resize; }
+        .resize-bottom  { bottom: 0; left: 0; right: 0; height: 20px; cursor: row-resize; }
+        .resize-corner  { bottom: 0; right: 0; width: 30px; height: 30px; cursor: nwse-resize; }
+        
+        .icon-hover { transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1); }
+        .icon-hover:hover { transform: translateY(-4px) scale(1.08); }
+        
+        .traffic-lights button { width: 13px; height: 13px; border-radius: 9999px; transition: all 0.15s ease; }
+    </style>
+</head>
+<body class="bg-black text-slate-200 select-none">
+    <!-- BOOT SCREEN -->
+    <div id="boot" class="fixed inset-0 bg-black z-[9999] flex items-center justify-center flex-col gap-6">
+        <div class="flex items-center gap-4">
+            <div class="w-16 h-16 rounded-3xl bg-gradient-to-br from-violet-500 to-cyan-400 flex items-center justify-center text-4xl shadow-xl">🌌</div>
+            <div>
+                <h1 class="title-font text-5xl font-semibold tracking-tighter text-white">AETHER<span class="text-violet-400">OS</span></h1>
+                <p class="text-slate-400 text-base">v9.8 Resizable • Windows Style</p>
+            </div>
+        </div>
+        <div class="w-72 h-0.5 bg-slate-800 rounded-full overflow-hidden">
+            <div id="boot-progress" class="h-full w-0 bg-gradient-to-r from-violet-500 to-cyan-400 transition-all duration-1200"></div>
+        </div>
+        <p class="text-slate-500 text-xs">Loading resizable windows...</p>
+    </div>
+
+    <!-- Desktop -->
+    <div id="desktop" class="absolute inset-0" style="background-image: url('https://picsum.photos/id/1015/1920/1080')">
+        <div class="absolute top-6 left-6 flex flex-col gap-8 z-10" id="desktop-icons"></div>
+    </div>
+
+    <!-- Windows Container -->
+    <div id="windows" class="absolute inset-0 pointer-events-none"></div>
+
+    <!-- Taskbar -->
+    <div class="taskbar fixed bottom-0 left-0 right-0 h-12 border-t border-white/10 flex items-center px-2 z-[999] text-xs">
+        <button onclick="toggleStartMenu()" class="flex items-center gap-2 px-4 py-1.5 hover:bg-white/10 rounded-xl transition-all">
+            <i class="fa fa-rocket text-violet-400"></i>
+            <span class="title-font font-semibold">AETHER</span>
+        </button>
+        <div class="flex items-center gap-1 mx-2" id="pinned-apps"></div>
+        <div class="flex-1 flex items-center gap-1" id="taskbar-open"></div>
+        <div class="flex items-center gap-4 text-slate-400">
+            <i onclick="showNotification('Connected', '5G Quantum')" class="fa fa-wifi cursor-pointer"></i>
+            <div id="clock" class="font-medium cursor-pointer" onclick="showClockPanel()">00:00</div>
+        </div>
+    </div>
+
+    <!-- Start Menu -->
+    <div id="start-menu" class="hidden glass fixed bottom-16 left-4 w-80 rounded-3xl border border-white/10 shadow-xl overflow-hidden z-[1000]">
+        <div class="p-4">
+            <input id="start-search" onkeyup="if(event.key==='Enter') searchApp(this.value)" class="w-full bg-slate-900 border border-white/10 rounded-2xl py-3 px-4 text-sm focus:outline-none" placeholder="Search...">
+            <div class="grid grid-cols-4 gap-3 mt-4 text-center text-xs" id="start-pinned"></div>
+        </div>
+        <div class="border-t border-white/10 p-3 flex justify-between text-xs">
+            <button onclick="shutdown()" class="text-red-400">Power</button>
+        </div>
+    </div>
+
+    <!-- Context Menu -->
+    <div id="context-menu" class="hidden glass fixed w-52 rounded-3xl border border-white/10 py-2 text-sm shadow-xl z-[2000]">
+        <div onclick="changeWallpaper()" class="px-6 py-2 hover:bg-white/10 cursor-pointer flex items-center gap-3"><i class="fa fa-image"></i><span>Change Wallpaper</span></div>
+    </div>
+
+    <!-- Notification -->
+    <div id="notification" class="hidden fixed bottom-16 right-4 glass border border-white/10 rounded-3xl px-5 py-3 w-72 shadow-xl flex gap-3"></div>
+
+    <script>
+        let zIndexCounter = 100;
+        let openWindows = {};
+        let currentWallpaper = 0;
+        const wallpapers = ['https://picsum.photos/id/1015/1920/1080','https://picsum.photos/id/201/1920/1080','https://picsum.photos/id/251/1920/1080','https://picsum.photos/id/870/1920/1080','https://picsum.photos/id/1016/1920/1080'];
+        
+        const apps = {
+            terminal: { name: "Terminal", icon: "fa-terminal", color: "text-emerald-400",
+                content: () => `<div class="h-full bg-black text-emerald-400 font-mono text-sm p-4 flex flex-col overflow-hidden"><div class="mb-2 text-emerald-300">AetherOS v9.8 • Type help</div><div id="term-output" class="flex-1 overflow-auto"></div><div class="flex"><span class="text-violet-400 mr-2">$</span><input id="term-input" class="flex-1 bg-transparent outline-none" autofocus></div></div>` },
+            calculator: { name: "Calculator", icon: "fa-calculator", color: "text-amber-400",
+                content: () => `
+                    <div class="h-full bg-slate-950 p-4 flex flex-col">
+                        <div id="calc-display" class="bg-slate-900 text-right text-5xl font-light p-6 rounded-2xl mb-4 h-20 flex items-center justify-end">0</div>
+                        <div class="grid grid-cols-4 gap-2 flex-1 text-2xl">
+                            <button onclick="calcClear()" class="bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-2xl py-4">C</button>
+                            <button onclick="calcOp('±')" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">±</button>
+                            <button onclick="calcOp('%')" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">%</button>
+                            <button onclick="calcOp('/')" class="bg-violet-500/20 hover:bg-violet-500/40 text-violet-400 rounded-2xl py-4">÷</button>
+                            <button onclick="calcNum(7)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">7</button>
+                            <button onclick="calcNum(8)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">8</button>
+                            <button onclick="calcNum(9)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">9</button>
+                            <button onclick="calcOp('*')" class="bg-violet-500/20 hover:bg-violet-500/40 text-violet-400 rounded-2xl py-4">×</button>
+                            <button onclick="calcNum(4)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">4</button>
+                            <button onclick="calcNum(5)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">5</button>
+                            <button onclick="calcNum(6)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">6</button>
+                            <button onclick="calcOp('-')" class="bg-violet-500/20 hover:bg-violet-500/40 text-violet-400 rounded-2xl py-4">−</button>
+                            <button onclick="calcNum(1)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">1</button>
+                            <button onclick="calcNum(2)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">2</button>
+                            <button onclick="calcNum(3)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">3</button>
+                            <button onclick="calcOp('+')" class="bg-violet-500/20 hover:bg-violet-500/40 text-violet-400 rounded-2xl py-4">+</button>
+                            <button onclick="calcNum(0)" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4 col-span-2">0</button>
+                            <button onclick="calcOp('.')" class="bg-slate-800 hover:bg-slate-700 rounded-2xl py-4">.</button>
+                            <button onclick="calcEquals()" class="bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl py-4">=</button>
+                        </div>
+                    </div>
+                ` },
+            notepad: { name: "Notepad", icon: "fa-file-lines", color: "text-sky-400",
+                content: () => `<div class="h-full flex flex-col"><div class="border-b border-white/10 px-4 py-2 flex gap-4 text-xs"><button onclick="notepadSave()" class="px-4 py-1 hover:bg-white/10 rounded-lg">Save</button><button onclick="notepadDownload()" class="px-4 py-1 hover:bg-white/10 rounded-lg">Export</button></div><textarea id="notepad-text" class="flex-1 bg-transparent p-6 text-lg outline-none resize-none" placeholder="Start typing..."></textarea></div>` },
+            grok: { name: "Grok AI", icon: "fa-robot", color: "text-purple-400",
+                content: () => `
+                    <div class="h-full flex flex-col bg-slate-950">
+                        <div class="p-4 border-b border-white/10 flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xl">🧠</div>
+                            <div><div class="font-semibold">Grok 4</div><div class="text-xs text-emerald-400">Ask anything</div></div>
+                        </div>
+                        <div id="grok-chat" class="flex-1 p-6 overflow-auto space-y-6"></div>
+                        <div class="p-4 border-t border-white/10">
+                            <div class="flex gap-2">
+                                <input id="grok-input" onkeypress="if(event.key==='Enter') sendGrokMessage()" class="flex-1 bg-slate-900 border border-white/10 rounded-3xl px-6 py-3 outline-none" placeholder="Ask anything...">
+                                <button onclick="sendGrokMessage()" class="bg-purple-500 w-12 h-12 rounded-3xl flex items-center justify-center"><i class="fa fa-paper-plane"></i></button>
+                            </div>
+                        </div>
+                    </div>
+                ` }
+        };
+        
+        function createDesktopIcon(appKey) {
+            const app = apps[appKey];
+            const icon = document.createElement('div');
+            icon.className = `flex flex-col items-center w-20 text-center icon-hover cursor-pointer`;
+            icon.innerHTML = `
+                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center text-4xl shadow-inner border border-white/10">
+                    <i class="fa ${app.icon} ${app.color}"></i>
+                </div>
+                <div class="mt-2 text-xs tracking-wide">${app.name}</div>
+            `;
+            icon.ondblclick = () => openApp(appKey);
+            return icon;
+        }
+        
+        function populateDesktopIcons() {
+            const container = document.getElementById('desktop-icons');
+            container.innerHTML = '';
+            Object.keys(apps).forEach(key => container.appendChild(createDesktopIcon(key)));
+        }
+        
+        function populatePinned() {
+            const container = document.getElementById('pinned-apps');
+            const startPinned = document.getElementById('start-pinned');
+            container.innerHTML = ''; startPinned.innerHTML = '';
+            Object.keys(apps).forEach(key => {
+                const app = apps[key];
+                const btn = document.createElement('button');
+                btn.className = `w-10 h-10 flex items-center justify-center hover:bg-white/10 rounded-2xl transition-all ${app.color}`;
+                btn.innerHTML = `<i class="fa ${app.icon} text-2xl"></i>`;
+                btn.onclick = () => openApp(key);
+                container.appendChild(btn);
+                
+                const sBtn = document.createElement('button');
+                sBtn.className = `flex flex-col items-center gap-1 text-xs hover:scale-110 transition-transform`;
+                sBtn.innerHTML = `<div class="w-12 h-12 bg-gradient-to-br from-slate-700 to-slate-900 rounded-2xl flex items-center justify-center text-3xl"><i class="fa ${app.icon} ${app.color}"></i></div><span>${app.name}</span>`;
+                sBtn.onclick = () => { openApp(key); toggleStartMenu(false); };
+                startPinned.appendChild(sBtn);
+            });
+        }
+        
+        function createWindow(id, title, iconClass, contentHTML) {
+            if (openWindows[id]) { bringToFront(openWindows[id].element); return; }
+            const win = document.createElement('div');
+            win.className = `window glass absolute rounded-3xl border border-white/10 overflow-hidden pointer-events-auto flex flex-col`;
+            win.style.width = '92vw';
+            win.style.height = '65vh';
+            win.style.left = '4vw';
+            win.style.top = '8vh';
+            win.style.zIndex = zIndexCounter++;
+            
+            win.innerHTML = `
+                <div class="window-header h-11 bg-slate-900/95 flex items-center px-4 border-b border-white/10">
+                    <div class="traffic-lights flex gap-2 mr-6">
+                        <button onclick="closeWindow('${id}')" class="bg-red-500"></button>
+                        <button onclick="minimizeWindow('${id}')" class="bg-yellow-400"></button>
+                        <button onclick="maximizeWindow('${id}')" class="bg-green-500"></button>
+                    </div>
+                    <div class="flex-1 text-center text-sm font-medium flex items-center justify-center gap-2">
+                        <i class="fa ${iconClass} ${apps[id] ? apps[id].color : ''}"></i> ${title}
+                    </div>
+                </div>
+                <div class="flex-1 overflow-hidden">${contentHTML}</div>
+                
+                <!-- Windows-style resize handles -->
+                <div class="resize-handle resize-right" onmousedown="startResize(event, '${id}', 'e')" ontouchstart="startResize(event, '${id}', 'e')"></div>
+                <div class="resize-handle resize-bottom" onmousedown="startResize(event, '${id}', 's')" ontouchstart="startResize(event, '${id}', 's')"></div>
+                <div class="resize-handle resize-corner" onmousedown="startResize(event, '${id}', 'se')" ontouchstart="startResize(event, '${id}', 'se')"></div>
+            `;
+            
+            document.getElementById('windows').appendChild(win);
+            const header = win.querySelector('.window-header');
+            makeDraggable(win, header);
+            openWindows[id] = { element: win, minimized: false };
+            updateTaskbarOpen();
+            bringToFront(win);
+            
+            if (id === 'terminal') initTerminal(win);
+            if (id === 'calculator') initCalculator(win);
+            if (id === 'grok') initGrok(win);
+        }
+        
+        function makeDraggable(win, header) {
+            let startX, startY, initialLeft, initialTop, dx = 0, dy = 0;
+            const startDrag = (clientX, clientY) => {
+                bringToFront(win);
+                const rect = win.getBoundingClientRect();
+                initialLeft = parseFloat(win.style.left) || rect.left;
+                initialTop = parseFloat(win.style.top) || rect.top;
+                startX = clientX; startY = clientY;
+                dx = 0; dy = 0;
+                win.style.transition = 'none';
+                win.style.willChange = 'transform';
+            };
+            const doDrag = (clientX, clientY) => {
+                dx = clientX - startX;
+                dy = clientY - startY;
+                win.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+            };
+            const endDrag = () => {
+                const newLeft = initialLeft + dx;
+                const newTop = initialTop + dy;
+                win.style.left = `${Math.max(0, Math.min(newLeft, window.innerWidth - win.offsetWidth))}px`;
+                win.style.top = `${Math.max(0, Math.min(newTop, window.innerHeight - win.offsetHeight - 80))}px`;
+                win.style.transform = 'none';
+                win.style.transition = 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)';
+                win.style.willChange = 'auto';
+            };
+            
+            header.addEventListener('mousedown', e => {
+                if (e.target.tagName === 'BUTTON') return;
+                e.preventDefault();
+                startDrag(e.clientX, e.clientY);
+                const move = ev => doDrag(ev.clientX, ev.clientY);
+                const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); endDrag(); };
+                document.addEventListener('mousemove', move);
+                document.addEventListener('mouseup', up);
+            });
+            
+            header.addEventListener('touchstart', e => {
+                if (e.target.tagName === 'BUTTON') return;
+                e.preventDefault();
+                const t = e.touches[0];
+                startDrag(t.clientX, t.clientY);
+                const move = ev => { ev.preventDefault(); const tt = ev.touches[0]; doDrag(tt.clientX, tt.clientY); };
+                const end = () => { document.removeEventListener('touchmove', move); document.removeEventListener('touchend', end); endDrag(); };
+                document.addEventListener('touchmove', move, { passive: false });
+                document.addEventListener('touchend', end);
+            }, { passive: false });
+        }
+        
+        let currentResizing = null;
+        let resizeDirection = '';
+        function startResize(evt, id, dir) {
+            evt.preventDefault(); evt.stopPropagation();
+            currentResizing = openWindows[id].element;
+            resizeDirection = dir;
+            
+            let startX, startY, startW, startH, startLeft, startTop;
+            if (evt.touches) {
+                startX = evt.touches[0].clientX;
+                startY = evt.touches[0].clientY;
+            } else {
+                startX = evt.clientX;
+                startY = evt.clientY;
+            }
+            startW = currentResizing.offsetWidth;
+            startH = currentResizing.offsetHeight;
+            startLeft = parseFloat(currentResizing.style.left) || 0;
+            startTop = parseFloat(currentResizing.style.top) || 0;
+            
+            const move = ev => {
+                let clientX, clientY;
+                if (ev.touches) { clientX = ev.touches[0].clientX; clientY = ev.touches[0].clientY; }
+                else { clientX = ev.clientX; clientY = ev.clientY; }
+                
+                let newW = startW;
+                let newH = startH;
+                let newLeft = startLeft;
+                let newTop = startTop;
+                
+                if (resizeDirection.includes('e')) newW = startW + (clientX - startX);
+                if (resizeDirection.includes('s')) newH = startH + (clientY - startY);
+                
+                newW = Math.max(320, newW);
+                newH = Math.max(240, newH);
+                
+                currentResizing.style.width = newW + 'px';
+                currentResizing.style.height = newH + 'px';
+                
+                if (resizeDirection.includes('w')) {
+                    const deltaX = clientX - startX;
+                    currentResizing.style.left = (startLeft + deltaX) + 'px';
+                    currentResizing.style.width = (startW - deltaX) + 'px';
+                }
+            };
+            
+            const up = () => {
+                document.removeEventListener('mousemove', move);
+                document.removeEventListener('mouseup', up);
+                document.removeEventListener('touchmove', move);
+                document.removeEventListener('touchend', up);
+                currentResizing = null;
+            };
+            
+            document.addEventListener('mousemove', move);
+            document.addEventListener('mouseup', up);
+            document.addEventListener('touchmove', move, { passive: false });
+            document.addEventListener('touchend', up);
+        }
+        
+        function bringToFront(win) { win.style.zIndex = zIndexCounter++; }
+        function closeWindow(id) { if (openWindows[id]) { openWindows[id].element.remove(); delete openWindows[id]; updateTaskbarOpen(); } }
+        function minimizeWindow(id) { if (openWindows[id]) { openWindows[id].element.style.display = 'none'; openWindows[id].minimized = true; updateTaskbarOpen(); } }
+        function maximizeWindow(id) {
+            const win = openWindows[id].element;
+            if (win.style.width === '95vw') {
+                win.style.width = '92vw';
+                win.style.height = '65vh';
+            } else {
+                win.style.width = '95vw';
+                win.style.height = '85vh';
+                win.style.left = '2.5vw';
+                win.style.top = '5vh';
+            }
+        }
+        function updateTaskbarOpen() {
+            const container = document.getElementById('taskbar-open');
+            container.innerHTML = '';
+            Object.keys(openWindows).forEach(id => {
+                const app = apps[id];
+                const btn = document.createElement('button');
+                btn.className = `flex items-center gap-2 px-3 py-1 hover:bg-white/10 rounded-xl text-xs ${openWindows[id].minimized ? 'opacity-60' : ''}`;
+                btn.innerHTML = `<i class="fa ${app.icon} ${app.color}"></i><span>${app.name}</span>`;
+                btn.onclick = () => {
+                    const win = openWindows[id].element;
+                    if (openWindows[id].minimized) { win.style.display = 'flex'; openWindows[id].minimized = false; }
+                    bringToFront(win);
+                };
+                container.appendChild(btn);
+            });
+        }
+        function openApp(appKey) {
+            const app = apps[appKey];
+            if (!app) return;
+            createWindow(appKey, app.name, app.icon, app.content());
+            toggleStartMenu(false);
+        }
+        
+        function initTerminal(win) {
+            const output = win.querySelector('#term-output');
+            const input = win.querySelector('#term-input');
+            function print(line) { const p = document.createElement('div'); p.textContent = line; output.appendChild(p); output.scrollTop = output.scrollHeight; }
+            print('Welcome to AetherOS v9.8');
+            print("Type 'help'");
+            const commands = { help: () => 'help, clear, date', date: () => new Date().toLocaleString() };
+            input.addEventListener('keydown', e => {
+                if (e.key === 'Enter') {
+                    const cmd = input.value.trim();
+                    print(`$ ${cmd}`);
+                    if (cmd === 'clear') output.innerHTML = '';
+                    else if (commands[cmd]) print(commands[cmd]());
+                    else print('Unknown command');
+                    input.value = '';
+                }
+            });
+        }
+        
+        let calcMemory = '';
+        function initCalculator(win) { window.calcDisplay = win.querySelector('#calc-display'); window.calcDisplay.textContent = '0'; }
+        window.calcNum = n => { if (window.calcDisplay) { let c = window.calcDisplay.textContent === '0' ? '' : window.calcDisplay.textContent; window.calcDisplay.textContent = c + n; } };
+        window.calcOp = op => { if (window.calcDisplay) { calcMemory = window.calcDisplay.textContent + op; window.calcDisplay.textContent = '0'; } };
+        window.calcEquals = () => { if (window.calcDisplay) { try { window.calcDisplay.textContent = eval(calcMemory + window.calcDisplay.textContent); calcMemory = ''; } catch(e) { window.calcDisplay.textContent = 'Error'; } } };
+        window.calcClear = () => { if (window.calcDisplay) { window.calcDisplay.textContent = '0'; calcMemory = ''; } };
+        
+        function initGrok(win) {
+            const chat = win.querySelector('#grok-chat');
+            const input = win.querySelector('#grok-input');
+            function add(text, user) {
+                const d = document.createElement('div');
+                d.className = `flex ${user ? 'justify-end' : ''}`;
+                d.innerHTML = `<div class="${user ? 'bg-violet-600 text-white' : 'bg-slate-800'} max-w-[80%] rounded-3xl px-5 py-3">${text}</div>`;
+                chat.appendChild(d); chat.scrollTop = chat.scrollHeight;
+            }
+            setTimeout(() => add("Hi, I'm Grok. Ask me anything!", false), 400);
+            window.sendGrokMessage = () => {
+                const msg = input.value.trim();
+                if (!msg) return;
+                add(msg, true); input.value = '';
+                setTimeout(() => add("Cool question! The universe is wild.", false), 700);
+            };
+        }
+        
+        function toggleStartMenu(force) {
+            const m = document.getElementById('start-menu');
+            if (typeof force === 'boolean') m.classList.toggle('hidden', !force);
+            else m.classList.toggle('hidden');
+        }
+        function searchApp(q) {
+            if (!q) return;
+            Object.keys(apps).forEach(k => {
+                if (apps[k].name.toLowerCase().includes(q.toLowerCase())) { openApp(k); toggleStartMenu(false); }
+            });
+        }
+        
+        function showContextMenu(e) {
+            e.preventDefault();
+            const m = document.getElementById('context-menu');
+            m.style.left = e.clientX + 'px';
+            m.style.top = e.clientY + 'px';
+            m.classList.remove('hidden');
+            setTimeout(() => document.addEventListener('click', () => m.classList.add('hidden'), {once: true}), 10);
+        }
+        
+        function changeWallpaper() {
+            currentWallpaper = (currentWallpaper + 1) % wallpapers.length;
+            document.getElementById('desktop').style.backgroundImage = `url('${wallpapers[currentWallpaper]}')`;
+        }
+        
+        function showNotification(title, body) {
+            const n = document.getElementById('notification');
+            n.innerHTML = `<div class="text-3xl">🌌</div><div><div class="font-semibold">${title}</div><div class="text-sm text-slate-400">${body}</div></div>`;
+            n.classList.remove('hidden');
+            setTimeout(() => n.classList.add('hidden'), 3000);
+        }
+        
+        function showClockPanel() {
+            alert(new Date().toLocaleString());
+        }
+        
+        function updateClock() {
+            const c = document.getElementById('clock');
+            setInterval(() => c.textContent = new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}), 1000);
+        }
+        
+        function shutdown() {
+            if (confirm('Shut down AetherOS?')) document.body.innerHTML = `<div class="fixed inset-0 bg-black flex items-center justify-center"><div class="text-center"><div class="text-6xl mb-6">🌌</div><h1 class="title-font text-5xl">AetherOS</h1><p class="text-slate-400 mt-4">Safe to close</p></div></div>`;
+        }
+        
+        function bootSequence() {
+            const boot = document.getElementById('boot');
+            const progress = document.getElementById('boot-progress');
+            progress.style.width = '100%';
+            setTimeout(() => {
+                boot.style.transition = 'opacity 0.6s';
+                boot.style.opacity = '0';
+                setTimeout(() => {
+                    boot.style.display = 'none';
+                    showNotification('Boot Complete!', 'Windows-style resize handles added • Touch the right/bottom/corner!');
+                }, 600);
+            }, 1300);
+        }
+        
+        function initializeAetherOS() {
+            populateDesktopIcons();
+            populatePinned();
+            updateClock();
+            bootSequence();
+            setTimeout(() => openApp('terminal'), 1600);
+        }
+        
+        window.onload = initializeAetherOS;
+        
+        document.getElementById('desktop').addEventListener('contextmenu', showContextMenu);
+        
+        document.addEventListener('keydown', e => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); toggleStartMenu(true); }
+            if (e.key === 'Escape') toggleStartMenu(false);
+        });
+    </script>
+</body>
+</html>
